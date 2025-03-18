@@ -4,7 +4,7 @@ import os
 from fpdf import FPDF
 
 # ✅ Load API Key securely
-API_KEY = os.getenv("gemini")  # Ensure this environment variable is set
+API_KEY = os.getenv("Gen_API")  # Ensure this environment variable is set
 if not API_KEY:
     st.error("API Key is missing! Set 'Gen_API' as an environment variable.")
     st.stop()
