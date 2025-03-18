@@ -14,7 +14,7 @@ genai.configure(api_key=Gen_API)
 
 # ✅ Function to call Gemini API and get recipe suggestions
 def get_recipe_suggestions(prompt, ingredients, dietary_pref, max_time):
-    model = genai.GenerativeModel("gemini-1.5-flash")  # Using a fast model
+    model = genai.GenerativeModel("gemini-2.0-flash")  # Using a fast model
     full_prompt = (
         f"{prompt}\n\n"
         f"Ingredients: {', '.join(ingredients)}\n"
