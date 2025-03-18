@@ -3,7 +3,7 @@ import requests
 import json
 
 # Replace this with your actual Gemini API endpoint URL.
-GEMINI_API_URL = "https://api.gemini.com/v1/recipe_suggestions"
+GEMINI_API_URL = st.secrets["api_keys"]["gemini"]
 
 def get_recipe_suggestions(prompt, ingredients, dietary_pref, max_time):
     """
