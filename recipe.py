@@ -1,95 +1,84 @@
 import streamlit as st
-import requests
+import google.generativeai as genai
+import os
+from fpdf import FPDF
 
-# Gemini endpoint provided by Google Generative Language API.
-# Here we assume the full endpoint with method suffix ":generate" is required.
-GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generate"
+# ✅ Load API Key securely
+API_KEY = os.getenv("gemini")  # Ensure this environment variable is set
+if not API_KEY:
+    st.error("API Key is missing! Set 'Gen_API' as an environment variable.")
+    st.stop()
 
-def get_recipe_suggestions(prompt, ingredients, dietary_pref, max_time, api_key):
-    """
-    Calls the Gemini API to fetch recipe suggestions.
-    
-    Combines the user's prompt, ingredients, dietary preference, and maximum prep time
-    into a full prompt, then sends a POST request to the Gemini API endpoint.
-    
-    The API key is passed as a query parameter (common for Google Cloud APIs).
-    Adjust the payload and response parsing based on the official API docs.
-    """
-    # Build a comprehensive prompt from user inputs
+# ✅ Configure Google Gemini API
+genai.configure(api_key=API_KEY)
+
+# ✅ Function to call Gemini API and get recipe suggestions
+def get_recipe_suggestions(prompt, ingredients, dietary_pref, max_time):
+    model = genai.GenerativeModel("gemini-1.5-flash")  # Using a fast model
     full_prompt = (
         f"{prompt}\n\n"
         f"Ingredients: {', '.join(ingredients)}\n"
         f"Dietary Preference: {dietary_pref}\n"
-        f"Maximum Preparation Time: {max_time} minutes\n\n"
-        "Please provide a quick, delicious Indian recipe along with step-by-step cooking instructions."
+        f"Max Preparation Time: {max_time} minutes\n\n"
+        "Please provide a quick Indian recipe with step-by-step instructions."
     )
-    
-    # Construct the payload. Adjust keys based on the API documentation.
-    payload = {
-        "prompt": {
-            "text": full_prompt
-        },
-        "temperature": 0.7,          # Adjust temperature as needed
-        "max_output_tokens": 256     # Adjust token limit as needed
-    }
-    
-    # Pass the API key as a query parameter.
-    params = {"key": api_key}
-    
-    try:
-        response = requests.post(GEMINI_API_URL, json=payload, params=params)
-        response.raise_for_status()
-        data = response.json()
-        # Here we assume the API returns a list of candidate outputs under "candidates"
-        # Each candidate is assumed to have an "output" field with the recipe text.
-        candidates = data.get("candidates", [])
-        recipes = []
-        for candidate in candidates:
-            # Create a simple recipe structure; adjust as needed.
-            recipes.append({
-                "name": "Generated Recipe",
-                "details": candidate.get("output", "No details provided.")
-            })
-        return recipes
-    except requests.RequestException as e:
-        st.error(f"Error contacting Gemini API: {e}")
-        return []
 
-def main():
-    st.title("Quick Indian Food Recipe Suggester using Gemini")
-    st.write("Provide a prompt and available ingredients to get quick, delicious Indian food recipes, powered by Google Gemini API.")
+    try:
+        response = model.generate_content(full_prompt)
+        return response.text if response else "No recipe found."
+    except Exception as e:
+        st.error(f"Error contacting Gemini API: {e}")
+        return None
+
+# ✅ Function to create a PDF of the recipe
+def generate_pdf(recipe_text):
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
     
-    # Input fields for user data
+    pdf.set_font("Arial", style="B", size=16)
+    pdf.cell(200, 10, "Generated Recipe", ln=True, align="C")
+    
+    pdf.set_font("Arial", size=12)
+    pdf.multi_cell(0, 10, recipe_text)
+    
+    pdf_path = "recipe.pdf"
+    pdf.output(pdf_path)
+    return pdf_path
+
+# ✅ Streamlit UI
+def main():
+    st.title("Quick Indian Recipe Generator 🍛")
+    st.write("Enter a prompt and available ingredients to get a quick Indian recipe!")
+
     prompt = st.text_input("Enter your prompt", placeholder="E.g., 'I want a spicy, quick dinner recipe'")
-    ingredients_input = st.text_area("Enter available ingredients (comma separated)", 
-                                     placeholder="E.g., tomato, onion, paneer, chickpeas")
+    ingredients_input = st.text_area("Enter ingredients (comma separated)", placeholder="Tomato, onion, paneer, chickpeas")
     dietary_options = ["None", "Vegetarian", "Vegan", "Gluten-Free", "Low-Carb"]
     dietary_pref = st.selectbox("Select Dietary Preference", options=dietary_options)
-    max_time = st.slider("Select maximum preparation time (minutes)", min_value=5, max_value=120, value=16)
-    
-    # Retrieve the Gemini API key from Streamlit secrets.
-    gemini_api_key = st.secrets["api_keys"]["gemini"]
-    
-    if st.button("Suggest Recipes"):
-        # Process the ingredients input into a list
+    max_time = st.slider("Max Prep Time (minutes)", min_value=5, max_value=60, value=15)
+
+    if st.button("Generate Recipe"):
         ingredients = [ingredient.strip() for ingredient in ingredients_input.split(",") if ingredient.strip()]
         
         st.write("### Your Input:")
-        st.write("**Prompt:**", prompt)
-        st.write("**Ingredients:**", ingredients)
-        st.write("**Dietary Preference:**", dietary_pref)
-        st.write("**Max Prep Time:**", f"{max_time} minutes")
+        st.write(f"**Prompt:** {prompt}")
+        st.write(f"**Ingredients:** {', '.join(ingredients)}")
+        st.write(f"**Dietary Preference:** {dietary_pref}")
+        st.write(f"**Max Prep Time:** {max_time} minutes")
         
-        # Get recipe suggestions from the Gemini API
-        recipes = get_recipe_suggestions(prompt, ingredients, dietary_pref, max_time, gemini_api_key)
+        # ✅ Get Recipe from Gemini
+        recipe = get_recipe_suggestions(prompt, ingredients, dietary_pref, max_time)
         
-        if recipes:
-            st.write("### Suggested Recipes:")
-            for recipe in recipes:
-                st.subheader(recipe.get("name", "Generated Recipe"))
-                st.write(recipe.get("details", "No details provided."))
+        if recipe:
+            st.write("### Suggested Recipe:")
+            st.write(recipe)
+            
+            # ✅ Generate PDF
+            pdf_path = generate_pdf(recipe)
+            with open(pdf_path, "rb") as file:
+                st.download_button("Download Recipe as PDF", file, file_name="recipe.pdf", mime="application/pdf")
         else:
-            st.write("No recipes found matching your criteria.")
+            st.write("No recipe found. Please try again.")
 
 if __name__ == "__main__":
     main()
