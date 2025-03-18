@@ -1,20 +1,20 @@
 import streamlit as st
 import google.generativeai as genai
-import os
 from fpdf import FPDF
 
-# ✅ Load API Key securely
-API_KEY = os.getenv("gemini")  # Ensure this environment variable is set
-if not API_KEY:
-    st.error("API Key is missing! Set 'Gen_API' as an environment variable.")
+# ✅ Fetch API Key Securely from Streamlit Secrets
+if "API_KEYS" not in st.secrets or "Gen_API" not in st.secrets["API_KEYS"]:
+    st.error("API Key is missing! Please set it in Streamlit secrets.")
     st.stop()
 
-# ✅ Configure Google Gemini API
-genai.configure(api_key=Gen_API)
+API_KEY = st.secrets["API_KEYS"]["Gen_API"]
+
+# ✅ Configure Gemini API
+genai.configure(api_key=API_KEY)
 
 # ✅ Function to call Gemini API and get recipe suggestions
 def get_recipe_suggestions(prompt, ingredients, dietary_pref, max_time):
-    model = genai.GenerativeModel("gemini-2.0-flash")  # Using a fast model
+    model = genai.GenerativeModel("gemini-1.5-flash")  # Using a fast model
     full_prompt = (
         f"{prompt}\n\n"
         f"Ingredients: {', '.join(ingredients)}\n"
